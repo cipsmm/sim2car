@@ -77,6 +77,11 @@ public class TrafficLightView {
 		});
 
 	}
+
+	public void messageAlert() {
+		Color c = this.getColor();
+		setColor(Color.blue);
+	}
 	
 	public void changeColor() {
 		if (trafficLightColor == Color.red) {

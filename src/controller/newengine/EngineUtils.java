@@ -1,5 +1,6 @@
 package controller.newengine;
 
+import application.dynamic_routing.CarDynamicRoutingApp;
 import gui.TrafficLightView;
 import gui.Viewer;
 
@@ -15,16 +16,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TreeMap;
-import java.util.Vector;
 import java.util.logging.Logger;
 
 import application.Application;
@@ -44,6 +37,7 @@ import model.OSMgraph.Way;
 import model.mobility.MobilityEngine;
 import model.parameters.Globals;
 import model.parameters.MapConfig;
+import model.personality.PersonalityTypes;
 import utils.ComputeAverageSpeeds;
 import utils.ComputeStreetVisits;
 import utils.SphericalMercator;
@@ -58,6 +52,16 @@ import controller.network.NetworkWiFi;
  * Class used to read the servers and the cars from files
  *
  */
+
+class GeoCarComparator implements Comparator<GeoCar> {
+
+	@Override
+	public int compare(GeoCar o1, GeoCar o2) {
+		return (int) (o2.getRouteIncreasedCostPercentage() - o1.getRouteIncreasedCostPercentage());
+	}
+}
+
+
 public final class EngineUtils {
 	
     /** Logger used by this class */
@@ -69,6 +73,9 @@ public final class EngineUtils {
 	/* Server info */
 	static double latEdge = 0d, lonEdge = 0d;
 	static long rows = 0, cols = 0;
+
+//	this queue is useful to choose which car is next for route dynamic update
+	public static PriorityQueue<GeoCar> carsQueue = new PriorityQueue<>(new GeoCarComparator());
 	
 	private EngineUtils() {}
 
@@ -89,6 +96,8 @@ public final class EngineUtils {
 			BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
 			String line;
 
+			int malicious_index = 0;
+
 			/* Read data about traces */
 			while ((line = br.readLine()) != null) {
 				/* If the simulation requires just a fraction of the cars
@@ -106,11 +115,22 @@ public final class EngineUtils {
 				st.nextToken(); /* <cab */
 				String srcId = st.nextToken(); /* id="XXXXX" */
 				srcId = srcId.substring(4, srcId.length() - 1); /* extract just the number */
+
+//				srcId = "1014";
 				String path = SimulationEngine.getInstance().getMapConfig().getTracesPath() + "joints_" + srcId + ".txt";
 				List<GeoCarRoute> routes = Utils.readCarTraces(path);
-				
+
 				GeoCar car = new GeoCar(count);
 				car.setRoutes(routes);
+//				added
+//				car.setSameEndPointToAllRoutes();
+
+				if (malicious_index < Globals.maliciousCars) {
+					malicious_index++;
+					car.setPersonalityType(Globals.maliciousPersonalityType);
+				}
+
+
 				if (count == 183)
 					System.out.println("read +");
 
@@ -120,11 +140,17 @@ public final class EngineUtils {
 					NetworkInterface netInterface = NetworkUtils.activateNetworkInterface(type, car);
 					car.addNetworkInterface(netInterface);
 				}
-				
+
+				/*add car's routing app*/
+				if (Globals.costSharingApps) {
+					Globals.activeApplications.add(ApplicationType.CAR_ROUTING_APP);
+				}
+
 				/* Create each application which is defined */
 				for( ApplicationType type : Globals.activeApplications )
 				{
 					Application app = ApplicationUtils.activateApplicationCar(type, car);
+
 					if( app == null )
 					{
 						logger.info(" Failed to create application with type " + type);
@@ -136,6 +162,7 @@ public final class EngineUtils {
 				viewer.addCar(car);
 				cars.put(car.getId(), car);
 				count++;
+
 			}
 			br.close();
 		} catch (IOException ex) {
@@ -147,7 +174,7 @@ public final class EngineUtils {
 				ex.printStackTrace();
 			}
 		}
-		System.out.println("cars" + cars.size());
+		System.out.println("cars " + cars.size());
 		return cars;
 	}
 	
@@ -351,6 +378,18 @@ public final class EngineUtils {
 			else
 				master.addApplication( app );
 		}
+
+		if (Globals.costSharingApps) {
+			type = ApplicationType.TRAFFIC_LIGHT_ROUTING_APP;
+			app = ApplicationUtils.activateApplicationTrafficLight(type, master);
+			if( app == null )
+			{
+				logger.info(" Failed to create application with type " + type);
+			}
+			else {
+				master.addApplication(app);
+			}
+		}
 	}
 	
 	/***
@@ -363,7 +402,6 @@ public final class EngineUtils {
 		
 		FileInputStream fstream = null;
 		TreeMap<Long,GeoTrafficLightMaster> trafficLights = new TreeMap<Long,GeoTrafficLightMaster>();
-		
 		try {
 			fstream = new FileInputStream(file);
 			BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
@@ -441,7 +479,7 @@ public final class EngineUtils {
 				ex.printStackTrace();
 			}
 		}
-		System.out.println(trafficLights.size());
+		System.out.println("nr of tl: " + trafficLights.size());
 		return trafficLights;
 	}
 	
@@ -455,7 +493,7 @@ public final class EngineUtils {
 	 */
 	private static TreeMap<Long,GeoTrafficLightMaster> readTrafficLights(
 			String inFile, String outFile, Viewer viewer, MobilityEngine mobilityEngine) {
-		
+
 		FileInputStream fstream = null;
 		TreeMap<Long,GeoTrafficLightMaster> trafficLights = new TreeMap<Long,GeoTrafficLightMaster>();
 		//if traffic lights were not loaded before, read them from the config

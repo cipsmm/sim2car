@@ -2,6 +2,7 @@ package model;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import model.OSMgraph.Node;
@@ -13,12 +14,26 @@ public class GeoCarRoute implements Serializable{
 	private MapPoint endPoint;
 	private List<Node> intersectionList;
 	private List<Node> originalintersectionList;
-	
+	private HashSet<Long> wayIdsSet;
+
+	public HashSet<Long> getWayIdsSet() {
+		return wayIdsSet;
+	}
+
+	public void setWayIdsSet(HashSet<Long> wayIdsSet) {
+		this.wayIdsSet = wayIdsSet;
+	}
+
 	public GeoCarRoute(MapPoint start, MapPoint end, List<Node> intersections) {
 		startPoint = start;
 		endPoint = end;
 		intersectionList = intersections;
 		originalintersectionList = new ArrayList<Node>(intersections);
+
+		this.wayIdsSet = new HashSet<Long>();
+		for (int i = 0; i < intersectionList.size(); i++) {
+			wayIdsSet.add(intersectionList.get(i).wayId);
+		}
 	}
 	
 	public MapPoint getStartPoint() {

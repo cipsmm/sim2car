@@ -8,5 +8,7 @@ public enum ApplicationType {
 	ROUTING_APP,	// the smart Navigator application
 	STREET_VISITS_APP,	// application that records the streets visit count
 	TRAFFIC_LIGHT_CONTROL_APP,
-	SYNCHRONIZE_INTERSECTIONS_APP // app that syncronize traffic lights in multiple intersections
+	SYNCHRONIZE_INTERSECTIONS_APP, // app that syncronize traffic lights in multiple intersections
+	TRAFFIC_LIGHT_ROUTING_APP,
+	CAR_ROUTING_APP
 }

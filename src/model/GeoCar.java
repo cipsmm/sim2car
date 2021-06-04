@@ -4,26 +4,26 @@ import java.io.File;
 import java.awt.Color;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import controller.network.NetworkInterface;
 import controller.network.NetworkType;
 import controller.network.NetworkWiFi;
+import controller.newengine.EngineUtils;
 import controller.newengine.SimulationEngine;
 import model.OSMgraph.Node;
+import model.OSMgraph.Way;
 import model.mobility.MobilityEngine;
 import model.network.Message;
 import model.network.MessageType;
 import model.parameters.Globals;
 import model.personality.Personality;
+import model.personality.PersonalityTypes;
 import model.personality.RegularPersonality;
-import utils.ComputeAverageFuelConsumption;
-import utils.Pair;
-import utils.TraceParsingTool;
+import utils.*;
 import utils.tracestool.Utils;
 import application.Application;
 import application.ApplicationType;
@@ -70,7 +70,12 @@ public class GeoCar extends Entity {
 	/** Used to count the number of times the car has stayed still */
 	private int still = 0;
 
+	private boolean ableToUpdate = true;
+
 	private boolean stoppedAtTrafficLight = false;
+
+
+	private boolean appointedForRouteRecalculation = false;
 
 	/**
 	 * List of nodes between current position and next position. The list is sorted
@@ -83,9 +88,53 @@ public class GeoCar extends Entity {
 	/** The car in front of this car. Is updated at every iteration */
 	private Pair<Entity, Double> elementAhead = null;
 
+	public static int ROUTE_CHECK_TIMESTAMP = 10;
+	private boolean turnToUpdateRoute = false;
+
 	/** Route length in time information */
 	StringBuffer routesTime = new StringBuffer();
 	// StringBuffer tracesTime = new StringBuffer();
+
+    /** reference to algorithms for dynamic routes, useful for routes updating  */
+	StreetsCostSharing streetsCostSharing;
+
+	public StreetsCostSharing getStreetsCostSharing() {
+		return streetsCostSharing;
+	}
+
+	public void setStreetsCostSharing(StreetsCostSharing streetsCostSharing) {
+		this.streetsCostSharing = streetsCostSharing;
+	}
+
+	DynamicRoutes dynamicRoutes;
+
+	private PersonalityTypes personalityType = PersonalityTypes.REGULAR;
+
+
+	public PersonalityTypes getPersonalityType() {
+		return personalityType;
+	}
+	public boolean isAppointedForRouteRecalculation() {
+		return appointedForRouteRecalculation;
+	}
+
+	public void setAppointedForRouteRecalculation(boolean appointedForRouteRecalculation) {
+		this.appointedForRouteRecalculation = appointedForRouteRecalculation;
+	}
+
+	public void setPersonalityType(PersonalityTypes personalityType) {
+		this.personalityType = personalityType;
+		this.streetsCostSharing = new StreetsCostSharingMalicious(this);
+	}
+
+	/** Street costs related elements (to update the costs dynamically)*/
+	private Way currentWay;
+	private Node startingNode;
+	private long wayStartTime;
+	private HashMap<Long, GeoCar> costSharedCars;
+	private HashSet<Long> costSharedTrafficLight;
+	private double entireRouteCost = 0;
+	public static double ROUTE_UPDATE_THRESHOLD = 0.1;
 
 	public GeoCar(int id) {
 		this(id, new RegularPersonality());
@@ -98,6 +147,10 @@ public class GeoCar extends Entity {
 		this.setCurrentPos(null);
 		this.setNextPos(null);
 		this.beginNewRoute = true;
+		costSharedCars = new HashMap<Long, GeoCar>();
+		costSharedTrafficLight = new HashSet<Long>();
+		streetsCostSharing = new StreetsCostSharing(this);
+		dynamicRoutes = new DynamicRoutes(streetsCostSharing);
 	}
 
 	public void setSpeed(double speed) {
@@ -286,6 +339,10 @@ public class GeoCar extends Entity {
 			long wayId = this.getCurrentPos().wayId;
 			int direction = -this.getCurrentPos().direction;
 
+			/*if there is a traffic light ahead, share the costs updates with it*/
+			if (Globals.costSharingApps && distance < 25)
+				sendUpdatesToTrafficLight(trafficLightInFront);
+
 			/* The car is close to the traffic light and the traffic light is red -> stop */
 			if (distance < 25 && trafficLightInFront.getTrafficLightColor(wayId, direction) == Color.red
 					&& !isStoppedAtTrafficLight()) {
@@ -295,6 +352,7 @@ public class GeoCar extends Entity {
 				setStopppedAtTrafficLight(true);
 				if (Globals.useTrafficLights || Globals.useDynamicTrafficLights)
 					sendDataToTrafficLight(trafficLightInFront, wayId, direction, this.getCurrentPos());
+
 			} else {
 
 				/*
@@ -314,7 +372,7 @@ public class GeoCar extends Entity {
 	}
 
 	/***
-	 * Sends a message via WiFi to the master trafic light in front to notify it
+	 * Sends a message via WiFi to the master traffic light in front to notify it
 	 * about it's presence. The master traffic light will put the car to the
 	 * corresponding waiting queue.
 	 * 
@@ -382,11 +440,167 @@ public class GeoCar extends Entity {
 		return g;
 	}
 
+	private int ok = 1;
+
+/**	task that calls findPath method from dynamicRoutes.
+	this task is sent to executor service */
+	Callable<Pair<List<Node>, HashSet<Long>>> updateRouteTask = new Callable<Pair<List<Node>, HashSet<Long>>>() {
+
+		@Override
+		public Pair<List<Node>, HashSet<Long>> call() throws Exception {
+
+			return dynamicRoutes.findPath(getCurrentRoute().getIntersectionList().get(0),
+					getCurrentRoute().getIntersectionList().get(getCurrentRoute().getIntersectionList().size() - 1));
+		}
+	};
+
+	private ExecutorService executor = Executors.newCachedThreadPool();
+
+	private boolean updatedRoute = false;
+
+	/** function called when it's current car's turn to find a new path.
+	* add the task to the thread pool.
+	* update the intersectionList and wayIdsSet*/
+	public void updateGeoCarRoute() {
+
+		Future<Pair<List<Node>, HashSet<Long>>> future = executor.submit(updateRouteTask);
+
+		try {
+			Pair<List<Node>, HashSet<Long>> updateResult = future.get(200, TimeUnit.MILLISECONDS);
+
+			this.getCurrentRoute().setIntersectionList(updateResult.getFirst());
+			this.getCurrentRoute().setWayIdsSet(updateResult.getSecond());
+			this.updatedRoute = true;
+
+		} catch (Exception e) {
+			// handle other exceptions
+		} finally {
+			future.cancel(true);
+		}
+
+	}
+
+
+	public void setRouteIncreasedCost(double routeIncreasedCost) {
+		this.routeIncreasedCost = routeIncreasedCost;
+	}
+
+	private double routeIncreasedCost = 0;
+
+	public double getRouteIncreasedCostPercentage() {
+		return routeIncreasedCostPercentage;
+	}
+
+	private double routeIncreasedCostPercentage = 0;
+
+
+	/** this method has the role to appoint the car for route recalculation
+	 * it is called from streetsCostSharing.updateWayCost when a way within
+	 * this car's route is updated (has a different cost)*/
+
+	public void appointForRouteRecalculation(double increasedWayCost) {
+		routeIncreasedCost += increasedWayCost;
+		routeIncreasedCostPercentage = (routeIncreasedCost * 100) / entireRouteCost;
+
+		if (!this.appointedForRouteRecalculation
+		&& routeIncreasedCost > this.entireRouteCost * GeoCar.ROUTE_UPDATE_THRESHOLD) {
+
+			EngineUtils.carsQueue.add(this);
+			this.appointedForRouteRecalculation = true;
+		}
+	}
+
+	public void setTurnToUpdateRoute(boolean t) {
+		this.turnToUpdateRoute = t;
+	}
+
+
+	/** method for street change detection.
+	* When a car change the current street, it will calculate the new discovered cost for the old current street
+	* and it will start a new timer for the new current street*/
+
+	public void updateCostRelatedElements() {
+
+		if (currentWay.id != getCurrentRoute().getIntersectionList().get(0).wayId) {
+			// get the finish node of the current way
+			Node finishNode = this.currentWay.getClosestNode(this.getCurrentPos().lat, this.getCurrentPos().lon);
+			streetsCostSharing.discoverNewWayCost(currentWay, startingNode, finishNode, this.wayStartTime, SimulationEngine.getInstance().getSimulationTime());
+
+			/*delete the way that has been traveled from the set (otherwise, risk to appoint for route recalc based
+			on your own report for a street that you passed) */
+			getCurrentRoute().getWayIdsSet().remove(currentWay.id);
+
+			this.currentWay = mobility.streetsGraph.get(getCurrentRoute().getIntersectionList().get(0).wayId);
+			this.wayStartTime = SimulationEngine.getInstance().getSimulationTime();
+
+			this.startingNode = this.currentWay.getClosestNode(this.getCurrentPos().lat, this.getCurrentPos().lon);
+		}
+	}
+
+
+	public void sendUpdatesToTrafficLight(GeoTrafficLightMaster trafficLightMaster) {
+
+		if (this.getStreetsCostSharing().getStreetUpdates().isEmpty() ||
+		costSharedTrafficLight.contains(trafficLightMaster.getId())) {
+			return;
+		}
+
+		NetworkInterface networkInterface = this.getNetworkInterface(NetworkType.Net_WiFi);
+
+		NetworkInterface discoveredTrafficLightMaster = ((NetworkWiFi) networkInterface).discoverTrafficLight(trafficLightMaster);
+		Message message = new Message(this.getId(), discoveredTrafficLightMaster.getOwner().getId(), this.streetsCostSharing.getStreetUpdates().clone(),
+				MessageType.CAR_INFORMS, ApplicationType.TRAFFIC_LIGHT_ROUTING_APP);
+		networkInterface.putMessage(message);
+
+		costSharedTrafficLight.add(trafficLightMaster.getId());
+	}
+
+
+	public void sendUpdatesToCar(GeoCar neighbourCar) {
+		NetworkInterface networkInterface = this.getNetworkInterface(NetworkType.Net_WiFi);
+
+		Message message = new Message(this.getId(), neighbourCar.getId(), this.streetsCostSharing.getStreetUpdates().clone(),
+				MessageType.CAR_INFORMS, ApplicationType.CAR_ROUTING_APP);
+		networkInterface.putMessage(message);
+	}
+
+	public void checkForNeighboursForCostSharing() {
+		/*Get neighbours for cars' cost sharing
+		* check if there was already an exchange of messages with that car*/
+		GeoCar carOnOppositeSide = mobility.getCarOnOppositeSide(this);
+
+		if (carOnOppositeSide != null
+				&& !costSharedCars.containsKey(carOnOppositeSide.getId())) {
+			costSharedCars.put(carOnOppositeSide.getId(), carOnOppositeSide);
+			sendUpdatesToCar(carOnOppositeSide);
+		}
+
+		Pair<Entity, Double> elemAheadAux = new Pair<>(elementAhead.getFirst(), elementAhead.getSecond());
+		GeoCar carAhead = null;
+		if (elemAheadAux != null && elemAheadAux.getFirst()!= null && elemAheadAux.getFirst() instanceof GeoCar
+				&& !costSharedCars.containsKey(elemAheadAux.getFirst().getId())
+				&& elemAheadAux.getSecond() < NetworkWiFi.maxWifiRange / 10000) {
+			costSharedCars.put(elemAheadAux.getFirst().getId(), (GeoCar) elemAheadAux.getFirst());
+			carAhead = (GeoCar) elementAhead.getFirst();
+			sendUpdatesToCar(carAhead);
+		}
+	}
+
+
+
 	/**
 	 * Prepares the next position the car will go to. This must be called after the
 	 * updateSpeed method.
 	 */
 	public MapPoint getNextPosition() {
+
+/*		this boolean is set to "true" in SimulationEngine (following a fair strategy,
+		each car has its chance for route recalculation) */
+		if (turnToUpdateRoute && Globals.dynamicRoutes) {
+			updateGeoCarRoute();
+			this.turnToUpdateRoute = false;
+		}
+
 		GeoCarRoute route = this.routes.get(0);
 		MapPoint newPos = null;
 		nodesToMoveOver = new LinkedList<Node>();
@@ -398,6 +612,7 @@ public class GeoCar extends Entity {
 
 		if (stoppedAtTrafficLight) {
 			hasMoved.set(true);
+//			System.out.println("return current position");
 			return this.getCurrentPos();
 		}
 
@@ -411,7 +626,9 @@ public class GeoCar extends Entity {
 				double avgFuelConsumption = ComputeAverageFuelConsumption.computeAverageFuelConsumption(routeFuelFromStart, 
 						timei);
 				routesTime.append((routes_idx++) + " " + timei + " " + avgSpeed + " " + avgFuelConsumption + System.lineSeparator());
+//				System.out.println("Reached destination: " + "id: " + this.getId() + "  avgSpeed: " + avgSpeed);
 			}
+//			System.out.println("null from 1 if");
 			return null;
 		}
 
@@ -419,6 +636,9 @@ public class GeoCar extends Entity {
 		Node prevNode = null;
 		Node nextNode = mobility.getSegmentByIndex(this.getCurrentPos());
 		int newDirection = this.getCurrentPos().direction;
+
+//		System.out.println("Intersection List size: " + route.getIntersectionList().size());
+//		System.out.println("id: " + nextNode.id + "  way id:  " + nextNode.wayId);
 		while (it.hasNext()) {
 			prevNode = nextNode;
 			nextNode = it.next();
@@ -430,6 +650,7 @@ public class GeoCar extends Entity {
 					 * TODO(mariana): e ceva gresit cu ruta asta, returnam null ca apoi sa i se faca
 					 * skip
 					 */
+//					System.out.println("null from mariana if");
 					return null;
 			}
 
@@ -492,7 +713,12 @@ public class GeoCar extends Entity {
 				double avgFuelConsumption = ComputeAverageFuelConsumption.computeAverageFuelConsumption(routeFuelFromStart, 
 						timei);
 				routesTime.append((routes_idx++) + " " + timei + " " + avgSpeed + " " + avgFuelConsumption + System.lineSeparator());
+//				System.out.println("Reached destination: " + "id: " + this.getId() + "  avgSpeed: " + avgSpeed);
+//				if (updatedRoute) System.out.println("Cu update BAA");
+
+
 			}
+//			System.out.println("null from reached dest last if");
 			return null;
 		}
 
@@ -503,6 +729,7 @@ public class GeoCar extends Entity {
 	 * Prepare next Move for this car object.
 	 */
 	public void prepareMove() {
+//		System.out.println(this.getId() + " oe way: " + this.getCurrentPos().wayId);
 		try {
 
 			/**
@@ -515,13 +742,15 @@ public class GeoCar extends Entity {
 					return;
 			}
 			if (this.getCurrentPos() == null) {
-				// System.out.println("begin new route");
 				setBeginNewRoute(true);
 				initRoute();
 				return;
 			}
 
 			elementAhead = mobility.getElementAhead(this, driver.getInfluenceDistance(speed));
+
+			if (Globals.costSharingApps && streetsCostSharing.getStreetUpdates().size() > 0)
+				checkForNeighboursForCostSharing();
 
 			oldSpeed = speed;
 			updateSpeed();
@@ -531,11 +760,16 @@ public class GeoCar extends Entity {
 			nextPos = getNextPosition();
 
 			this.setBeginNewRoute(false);
+			/*
+				aicisa imi da nextPosition null why ?????
+			 */
+//			if (nextPos == null) System.out.println("Problema din prepare move");
 			mobility.queueNextMove(this.getId(), nextPos);
 			hasMoved.set(false);
 
 		} catch (RuntimeException e) {
 			/** Something was wrong with the route, so it's better to start a new one. */
+//			System.out.println(e + " " + e.getStackTrace()[0].getLineNumber());
 			setBeginNewRoute(true);
 			// long timei = SimulationEngine.getInstance().getSimulationTime() -
 			// routeStartTime;
@@ -584,6 +818,7 @@ public class GeoCar extends Entity {
 					return;
 				}
 				if (newPosition == this.getCurrentPos()) {
+
 					if (still > 200) {
 						/* we've stayed too much time in the same place */
 						resetRoute();
@@ -611,10 +846,16 @@ public class GeoCar extends Entity {
 				mobility.removeQueuedCar(oldNextPos, this.getId());
 				this.setCurrentPos(newPosition);
 				mobility.addCar(this);
+
+//				update the elements before dropping relevant data
+				if (Globals.dynamicRoutes)
+					updateCostRelatedElements();
+
 				finishMove();
 			}
 		} catch (RuntimeException e) {
 			/** Something was wrong with the route, so it's better to start a new one. */
+
 			setBeginNewRoute(true);
 			initRoute();
 			return;
@@ -688,11 +929,19 @@ public class GeoCar extends Entity {
 		// tracesTime.append("< " + start.lat + " " + start.lon + " " + end.lat + " " +
 		// end.lon + " " + (start.timestamp.getTime() - end.timestamp.getTime()) / 1000
 		// + "\n");
+
+		/*		set the way of the first joint Node and set starting time in order to
+		 start current way cost*/
+		currentWay = mobility.streetsGraph.get(first.wayId);
+
+		this.startingNode = mobility.getSegmentByIndex(route.getStartPoint());
+		this.wayStartTime = SimulationEngine.getInstance().getSimulationTime();
 	}
 
 	public void printRouteData(String filename) {
 		try {
 			String city = SimulationEngine.getInstance().getMapConfig().getCity();
+			System.out.println("SE SCRIEEE!!!!!!!!!!!!!!!!!!  " + filename);
 			
 			city += "/";
 			if (Globals.useTrafficLights)
@@ -719,6 +968,9 @@ public class GeoCar extends Entity {
 	}
 
 	public void initRoute() {
+		updatedRoute = false;
+		costSharedTrafficLight.clear();
+
 		try {
 			if (isBeginNewRoute()) {
 				resetRoute();
@@ -759,11 +1011,15 @@ public class GeoCar extends Entity {
 					this.routes.add(route);
 			}
 			hasMoved.set(true);
+
+			entireRouteCost = this.streetsCostSharing.calculateEntireRouteCost(this.getCurrentRoute().getWayIdsSet());
+
 		} catch (RuntimeException e) {
 			this.setCurrentPos(null);
 			this.routes.remove(0);
 			hasMoved.set(true);
 		}
+
 	}
 
 	/**
@@ -786,6 +1042,7 @@ public class GeoCar extends Entity {
 	 * Destroy the next position.
 	 */
 	public void finishMove() {
+
 		nodesToMoveOver = null;
 		nextPos = null;
 	}

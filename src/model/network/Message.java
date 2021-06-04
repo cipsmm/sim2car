@@ -21,10 +21,18 @@ public class Message extends Header {
 	private ApplicationType appType;
 	private MessageType type;
 	private Integer priority;
+
+	private int messageDirection;
 	
 	private byte[] payload;
-	
-	
+
+	public int getMessageDirection() {
+		return messageDirection;
+	}
+
+	public void setMessageDirection(int messageDirection) {
+		this.messageDirection = messageDirection;
+	}
 
 	public Message(long sourceId, long destId, Object data, MessageType type, ApplicationType appType) {
 		this.setSourceId(sourceId);
@@ -32,6 +40,7 @@ public class Message extends Header {
 		this.setData(data);
 		this.setType(type);
 		this.setAppType(appType);
+		this.messageDirection = 1;
 	}
 
 	

@@ -38,7 +38,7 @@ public class Downloader {
 		
 		city = propF[0];
 	}
-	
+
 	public void downloadTraces(String propFile) {
 		
 		// Extract the city name
@@ -48,8 +48,8 @@ public class Downloader {
 			System.out.println("Trace files exist - Skipping DOWNLOAD STEP");
 		} else {
 			System.out.println("Trace files don't exist - Starting DOWNLOAD STEP");
-			DownloadCore core = new DownloadCore();
-			core.execute(this.city);
+//			DownloadCore core = new DownloadCore();
+//			core.execute(this.city);
 		}
 	}
 	
