@@ -9,6 +9,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
+import application.streetCostSharing.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharingMalicious;
 import controller.network.NetworkInterface;
 import controller.network.NetworkType;
 import controller.network.NetworkWiFi;

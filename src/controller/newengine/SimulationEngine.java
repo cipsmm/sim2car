@@ -28,7 +28,7 @@ import model.threadpool.ThreadPool;
 import model.threadpool.tasks.*;
 import controller.engine.EngineInterface;
 import controller.network.NetworkType;
-import utils.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharing;
 
 
 /**

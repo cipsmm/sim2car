@@ -11,7 +11,7 @@ import model.OSMgraph.Way;
 import model.mobility.MobilityEngine;
 import model.network.Message;
 import model.network.MessageType;
-import utils.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharing;
 import utils.tracestool.Utils;
 
 

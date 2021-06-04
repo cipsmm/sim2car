@@ -1,6 +1,6 @@
 package application.dynamic_routing;
 
-import utils.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharing;
 
 import java.util.HashMap;
 import java.util.HashSet;

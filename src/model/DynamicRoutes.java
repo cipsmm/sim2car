@@ -3,7 +3,7 @@ package model;
 import model.OSMgraph.Node;
 import model.OSMgraph.Way;
 import model.mobility.MobilityEngine;
-import utils.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharing;
 import utils.Pair;
 import utils.tracestool.Utils;
 

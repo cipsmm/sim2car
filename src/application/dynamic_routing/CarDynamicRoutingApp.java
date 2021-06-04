@@ -9,7 +9,7 @@ import model.mobility.MobilityEngine;
 import model.network.Message;
 import model.network.MessageType;
 import model.parameters.Globals;
-import utils.StreetsCostSharing;
+import application.streetCostSharing.StreetsCostSharing;
 
 import java.util.ArrayList;
 import java.util.HashMap;
