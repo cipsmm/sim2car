@@ -759,22 +759,6 @@ public class MobilityEngine {
 					return null;
 				}
 
-				/*uncomment to color the cars which communicates
-				* make some attributes public before*/
-//				if (distAhead > 1000)
-//				System.out.println("OPPOSITE: " + " car " + car.getId() + "   car " + carOnTheOtherSide.getId() + "  distance: " + distAhead
-//				+ "   NODE DIST  "+ TraceParsingTool.distance(next.lat, next.lon, carOnTheOtherSide.getCurrentPos().lat, carOnTheOtherSide.getCurrentPos().lon) + "    way: " + way.id);
-//
-//				List<CarView> carViewList = SimulationEngine.getInstance().viewer.carViewList;
-//				for (CarView carView : carViewList) {
-//					if (carView.car.getId() == car.getId()) {
-//						carView.setColor(Color.BLACK);
-//					}
-//					if (carView.car.getId() == carOnTheOtherSide.getId()) {
-//						carView.setColor(Color.BLACK);
-//					}
-//				}
-
 				return (GeoCar) carOnTheOtherSide;
 			}
 		}

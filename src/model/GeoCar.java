@@ -713,12 +713,8 @@ public class GeoCar extends Entity {
 				double avgFuelConsumption = ComputeAverageFuelConsumption.computeAverageFuelConsumption(routeFuelFromStart, 
 						timei);
 				routesTime.append((routes_idx++) + " " + timei + " " + avgSpeed + " " + avgFuelConsumption + System.lineSeparator());
-//				System.out.println("Reached destination: " + "id: " + this.getId() + "  avgSpeed: " + avgSpeed);
-//				if (updatedRoute) System.out.println("Cu update BAA");
-
 
 			}
-//			System.out.println("null from reached dest last if");
 			return null;
 		}
 
@@ -729,7 +725,6 @@ public class GeoCar extends Entity {
 	 * Prepare next Move for this car object.
 	 */
 	public void prepareMove() {
-//		System.out.println(this.getId() + " oe way: " + this.getCurrentPos().wayId);
 		try {
 
 			/**
@@ -755,21 +750,16 @@ public class GeoCar extends Entity {
 			oldSpeed = speed;
 			updateSpeed();
 
-			// System.out.println("speed: " + speed);
-			// System.out.println("way: " + this.getCurrentPos().wayId);
 			nextPos = getNextPosition();
 
 			this.setBeginNewRoute(false);
-			/*
-				aicisa imi da nextPosition null why ?????
-			 */
-//			if (nextPos == null) System.out.println("Problema din prepare move");
+
 			mobility.queueNextMove(this.getId(), nextPos);
 			hasMoved.set(false);
 
 		} catch (RuntimeException e) {
 			/** Something was wrong with the route, so it's better to start a new one. */
-//			System.out.println(e + " " + e.getStackTrace()[0].getLineNumber());
+
 			setBeginNewRoute(true);
 			// long timei = SimulationEngine.getInstance().getSimulationTime() -
 			// routeStartTime;
