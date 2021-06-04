@@ -49,7 +49,7 @@ public class Globals {
 
 													/* Malicious Behavior */
 	@Parameter(names = {"--carsCount"}, description = "The number of cars simulated.")
-    public static int carsCount = 500;
+    public static int carsCount = 300;
 
 	@Parameter(names = {"--maliciousCars"}, description = "the number of malicious cars")
 	public static int maliciousCars = 0;

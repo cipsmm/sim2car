@@ -138,12 +138,12 @@ public class TrafficLightDynamicRoutingApp extends Application {
                 continue;
             }
 
-//            if (i == stepOver1 || i == stepOver2) {
-//                continue;
-//            }
+            if (i == stepOver1 || i == stepOver2) {
+                continue;
+            }
 
-            /** to reduce the cpu consumption uncomment it, and comment the ones above*/
-            if (i != stepOver1) continue;
+            /** to reduce the cpu consumption uncomment this, and comment the ones above*/
+//            if (i != stepOver1) continue;
 
             Message message = new Message(this.trafficLightMaster.getId(), neighbourTrafficLightId,
                     validUpdates.clone(), MessageType.TRAFFIC_LIGHT_INFORMS, ApplicationType.TRAFFIC_LIGHT_ROUTING_APP);
