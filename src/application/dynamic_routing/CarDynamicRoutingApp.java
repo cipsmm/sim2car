@@ -107,7 +107,7 @@ public class CarDynamicRoutingApp extends Application {
 
 
     /* this function has the role to iterate through the reported costs and to
-     * split them in valid data or outdated data (outdated data is useful only
+     * split them into valid data or outdated data (outdated data is useful only
      * in CARS communication context)*/
     private ArrayList<HashMap<Long, VotingStreetCostData>> updatesPreProcessing(Message m) {
         HashMap<Long, VotingStreetCostData> updates;
@@ -129,8 +129,6 @@ public class CarDynamicRoutingApp extends Application {
             if (!isOutdated(oldCost, updateCost, currentWayId, updates.get(currentWayId))) {
 
                 car.getStreetsCostSharing().updateWayCost(currentWayId, updates.get(currentWayId));
-
-                /*validUpdates will be useful when I'll add the validation policy*/
                 validUpdates.put(currentWayId, updates.get(currentWayId));
 
             } else {

@@ -164,7 +164,7 @@ public class TrafficLightDynamicRoutingApp extends Application {
 
 
     /* this function has the role to iterate through the reported costs and to
-    * split them in valid data or outdated data (outdated data is useful only
+    * split them into valid data or outdated data (outdated data is useful only
     * in CARS communication context*/
     private ArrayList<HashMap<Long, VotingStreetCostData>> updatesPreProcessing(Message m) {
         HashMap<Long, VotingStreetCostData> updates;
@@ -186,8 +186,6 @@ public class TrafficLightDynamicRoutingApp extends Application {
             if (Math.abs(oldCost - updateCost) >
                     (oldCost * StreetsCostSharing.STREET_COST_UPDATE_THRESHOLD)) {
                 streetGraphCost.put(currentWayId, updateCost);
-
-                /*validUpdates will be useful when I'll add the validation policy*/
                 validUpdates.put(currentWayId, updates.get(currentWayId));
 
                 /*put the news in the structure responsible for sharing with the cars*/

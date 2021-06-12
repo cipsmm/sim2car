@@ -11,7 +11,7 @@ public class VotingStreetCostData {
     double streetCost;
     boolean firstVotingSession;
 
-    /*each cost should be stamped by multiple entities before taking it into consideration
+    /*each cost should be stamped by multiple entities before taking it into consideration.
     * there could be multiple costs reported for the same street, so we need
     * to keep track of each cost ant its stamps in order to make the best updated decision*/
     HashMap<Double, HashSet<Long>> costVotingMap;
@@ -129,7 +129,7 @@ public class VotingStreetCostData {
             Iterator<Long> stampIterator = votingStreetCostData.getCostVotingMap().get(currentCost).iterator();
             long currentStamp;
 
-            /*if the cost is not present into the Map, add the cost and its stamps from the param object*/
+            /*if the cost is not present into the Map, add the cost and its stamps from params*/
             if (!this.costVotingMap.containsKey(currentCost)) {
                 costVotingMap.put(currentCost, votingStreetCostData.getCostVotingMap().get(currentCost));
             } else {
@@ -146,10 +146,10 @@ public class VotingStreetCostData {
         }
     }
 
-    /* check if there is a cost in the voting session that is over the threshold
+    /* check if there is a cost in the voting session that is greater than the threshold
     * there are 2 cases:
     * - an increased report
-    * - an decreased report
+    * - a decreased report
     * The threshold is dynamically changed depending on the report type*/
     public boolean isStreetCostUpdated() {
         Iterator<Double> costIterator = this.costVotingMap.keySet().iterator();
@@ -193,8 +193,8 @@ public class VotingStreetCostData {
         return false;
     }
 
-    /* after a decision is making, there is no point in keeping the costs
-    * that was not voted*/
+    /* after a decision is made, there is no point in keeping the costs
+    * that were not voted*/
     public void clearVoteSession() {
         this.costVotingMap.entrySet().removeIf(e -> e.getKey() != this.streetCost);
     }

@@ -497,7 +497,7 @@ public class GeoCar extends Entity {
 
 
 	/** this method has the role to appoint the car for route recalculation
-	 * it is called from streetsCostSharing.updateWayCost when a way within
+	 * it is called from streetsCostSharing.updateWayCost when a street within
 	 * this car's route is updated (has a different cost)*/
 
 	public void appointForRouteRecalculation(double increasedWayCost) {

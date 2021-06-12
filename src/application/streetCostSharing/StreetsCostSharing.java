@@ -83,7 +83,7 @@ public class StreetsCostSharing {
             outdatedCost = outdatedCosts.get(currentWayId).getStreetCost();
 
             /*check if the currentUpdateCost has been modified before receiving this update
-             * regarding outdated cost. So, if the difference between this 2 costs is under THRESHOLD,
+             * regarding outdated cost. So, if the difference between this 2 costs smaller than the THRESHOLD,
              * there has been an update over this cost so it is not outdated anymore*/
             if (Math.abs(currentUpdateCost - outdatedCost) <
                     (currentUpdateCost * StreetsCostSharing.STREET_COST_UPDATE_THRESHOLD)) {
@@ -217,7 +217,8 @@ public class StreetsCostSharing {
                 this.streetGraphCost.put(wayId, votingStreetCostData.getStreetCost());
 
             } else {
-                /*otherwise, we have to wait until the cost is voted*/
+                /*otherwise, we have to wait until the cost is voted.
+                * the new votes are added to the KB in the first if statement*/
             }
         } else {
             // do not use voting system

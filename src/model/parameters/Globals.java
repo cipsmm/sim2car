@@ -64,9 +64,7 @@ public class Globals {
 
 	@Parameter(names = {"--votingSystem"}, description = "activate the voting system for cars before route recalculation")
 	public static boolean useVotingSystem = false;
-
-
-													/* ends here*/
+													/* end MB*/
 	
 	@Parameter(names = {"--maxWaitingTime"}, description = "The maximum simulation time a car can wait at a traffic light.")
     public static int maxWaitingTime = 120;
