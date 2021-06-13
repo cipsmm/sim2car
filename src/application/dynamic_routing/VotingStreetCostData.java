@@ -16,8 +16,7 @@ public class VotingStreetCostData {
     * to keep track of each cost ant its stamps in order to make the best updated decision*/
     HashMap<Double, HashSet<Long>> costVotingMap;
 
-    public int UPPER_DYNAMIC_VOTING_THRESHOLD = 2;
-    public int LOWER_DYNAMIC_VOTING_THRESHOLD = 2;
+    public int DYNAMIC_VOTING_THRESHOLD = 2;
 
     public HashMap<Double, HashSet<Long>> getCostVotingMap() {
         return costVotingMap;
@@ -163,7 +162,7 @@ public class VotingStreetCostData {
 
             /*first voting session*/
             if (this.firstVotingSession) {
-                if (this.costVotingMap.get(currentCost).size() >= UPPER_DYNAMIC_VOTING_THRESHOLD) {
+                if (this.costVotingMap.get(currentCost).size() >= DYNAMIC_VOTING_THRESHOLD) {
                     this.streetCost = currentCost;
                     firstVotingSession = false;
                     return true;
@@ -171,21 +170,21 @@ public class VotingStreetCostData {
 
             } else if (currentCost > streetCost) {
                 /*increased cost -> UPPER_THRESHOLD*/
-                if (this.costVotingMap.get(currentCost).size() >= UPPER_DYNAMIC_VOTING_THRESHOLD) {
+                if (this.costVotingMap.get(currentCost).size() >= DYNAMIC_VOTING_THRESHOLD) {
                     this.streetCost = currentCost;
 
                     /*if another session wants to increase the cost more, it has to overwhelm a bigger threshold*/
-                    if (UPPER_DYNAMIC_VOTING_THRESHOLD < StreetsCostSharing.MAX_DYNAMIC_VOTING_THRESHOLD)
-                        UPPER_DYNAMIC_VOTING_THRESHOLD += 1;
+                    if (DYNAMIC_VOTING_THRESHOLD < StreetsCostSharing.MAX_DYNAMIC_VOTING_THRESHOLD)
+                        DYNAMIC_VOTING_THRESHOLD += 1;
                     return true;
                 }
             } else {
                 /*decreased cost -> LOWER_THRESHOLD*/
-                if (this.costVotingMap.get(currentCost).size() >= LOWER_DYNAMIC_VOTING_THRESHOLD) {
+                if (this.costVotingMap.get(currentCost).size() >= DYNAMIC_VOTING_THRESHOLD) {
                     this.streetCost = currentCost;
 
-                    if (LOWER_DYNAMIC_VOTING_THRESHOLD > StreetsCostSharing.MIN_DYNAMIC_VOTING_THRESHOLD)
-                        LOWER_DYNAMIC_VOTING_THRESHOLD -= 1;
+                    if (DYNAMIC_VOTING_THRESHOLD > StreetsCostSharing.MIN_DYNAMIC_VOTING_THRESHOLD)
+                        DYNAMIC_VOTING_THRESHOLD -= 1;
                     return true;
                 }
             }
@@ -214,8 +213,7 @@ public class VotingStreetCostData {
         return "VotingStreetCostData{" +
                 "streetCost=" + streetCost +
                 ", costVotingMap=" + costVotingMap.toString() +
-                ", UPPER_DYNAMIC_VOTING_THRESHOLD=" + UPPER_DYNAMIC_VOTING_THRESHOLD +
-                ", LOWER_DYNAMIC_VOTING_THRESHOLD=" + LOWER_DYNAMIC_VOTING_THRESHOLD +
+                ", UPPER_DYNAMIC_VOTING_THRESHOLD=" + DYNAMIC_VOTING_THRESHOLD +
                 '}';
     }
 }

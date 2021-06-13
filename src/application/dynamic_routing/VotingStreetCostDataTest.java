@@ -174,7 +174,7 @@ public class VotingStreetCostDataTest {
             System.out.println("[FAIL]");
         }
 
-        if (votingStreetCostData.UPPER_DYNAMIC_VOTING_THRESHOLD == 2) {
+        if (votingStreetCostData.DYNAMIC_VOTING_THRESHOLD == 2) {
             System.out.println("PASS");
         } else {
             System.out.println("FAIL");
@@ -208,7 +208,7 @@ public class VotingStreetCostDataTest {
         }
         System.out.println("Voted cost is: " + votingStreetCostData.getStreetCost());
 
-        if (votingStreetCostData.UPPER_DYNAMIC_VOTING_THRESHOLD == 3) {
+        if (votingStreetCostData.DYNAMIC_VOTING_THRESHOLD == 3) {
             System.out.println("PASS");
         } else {
             System.out.println("FAIL");
