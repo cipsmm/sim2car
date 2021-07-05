@@ -122,18 +122,22 @@ public class VotingStreetCostData {
     /** add new costs with stamps, or add new stamps to the existing costs*/
     public void addNewStamps(VotingStreetCostData votingStreetCostData) {
         Iterator<Double> costIterator = votingStreetCostData.getCostVotingMap().keySet().iterator();
-        Iterator<Double> currentSessionCostIterator = this.costVotingMap.keySet().iterator();
+        Iterator<Double> currentSessionCostIterator;
 
         while (costIterator.hasNext()) {
             double currentCost = costIterator.next();
+            currentSessionCostIterator = this.costVotingMap.keySet().iterator();
 
             Iterator<Long> stampIterator = votingStreetCostData.getCostVotingMap().get(currentCost).iterator();
             long currentStamp;
+            HashSet<Double> added = new HashSet<Double>();
 
             /*if the cost is not present into the Map, add the cost and its stamps from the param object*/
             while (currentSessionCostIterator.hasNext()) {
                 double votedCost = currentSessionCostIterator.next();
                 if (VotingStreetCostData.isTheSameStreetCost(votedCost, currentCost)) {
+                    added.add(currentCost);
+
                     /*iterate through stamps and add the new ones*/
                     while (stampIterator.hasNext()) {
                         currentStamp = stampIterator.next();
@@ -142,10 +146,9 @@ public class VotingStreetCostData {
                             this.costVotingMap.get(votedCost).add(currentStamp);
                         }
                     }
-                    return;
                 }
             }
-
+            if (added.contains(currentCost)) continue;
             /*if the cost not found in the session, add all stamps*/
             costVotingMap.put(currentCost, votingStreetCostData.getCostVotingMap().get(currentCost));
         }
