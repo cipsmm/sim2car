@@ -2,6 +2,8 @@ package application;
 
 import java.util.Vector;
 
+import application.dynamic_routing.CarDynamicRoutingApp;
+import application.dynamic_routing.TrafficLightDynamicRoutingApp;
 import controller.engine.EngineSimulation;
 import controller.newengine.SimulationEngine;
 import application.multipleIntersections.SynchronizeIntersectionsApplication;
@@ -38,6 +40,9 @@ public class ApplicationUtils {
 			return EngineSimulation.getInstance() != null ? new TileApplicationCar(car) : null;
 		case STREET_VISITS_APP:
 			return SimulationEngine.getInstance() != null ? new StreetVisitsApplication(car) : null;
+
+		case CAR_ROUTING_APP:
+			return SimulationEngine.getInstance() != null ? new CarDynamicRoutingApp(true, car, ApplicationType.CAR_ROUTING_APP) : null;
 		default:
 			return null;
 		}
@@ -54,6 +59,9 @@ public class ApplicationUtils {
 		switch (type) {
 			case TRAFFIC_LIGHT_CONTROL_APP:
 				return SimulationEngine.getInstance() != null ? new ApplicationTrafficLightControl(trafficLight) : null;
+
+			case TRAFFIC_LIGHT_ROUTING_APP:
+				return SimulationEngine.getInstance() != null ? new TrafficLightDynamicRoutingApp(true, trafficLight) : null;
 		default:
 			return null;
 		}
@@ -94,7 +102,7 @@ public class ApplicationUtils {
 	}
 
 	/**
-	 * @param netInterfaces - String with active Applications
+	 * @param //(netInterfaces) - String with active Applications
 	 */
 	public static void parseApplications(String activeApplications) {
 		String activeApps[] = activeApplications.split(",");

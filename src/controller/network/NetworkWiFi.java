@@ -1,8 +1,8 @@
 package controller.network;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
+import application.dynamic_routing.TrafficLightDynamicRoutingApp;
 import model.Entity;
 import model.GeoCar;
 import model.GeoServer;
@@ -98,7 +98,95 @@ public class NetworkWiFi extends NetworkInterface {
 		
 		return serverInRange.getNetworkInterface(this.getType());
 	}
-	
+
+	private boolean trafficLightDiffers(GeoTrafficLightMaster current, GeoTrafficLightMaster tl1, GeoTrafficLightMaster tl2, GeoTrafficLightMaster tl3) {
+		if (current != tl1 && current != tl2 && current != tl3)
+			return true;
+		return false;
+	}
+
+
+	/* this function discovers the closest neighbour from each geographic direction (N S E W)*/
+	public HashMap<Integer, NetworkInterface> discoverClosestTrafficLightsGeographic() {
+		Entity owner = getOwner();
+		ArrayList<GeoTrafficLightMaster> mtl = (ArrayList<GeoTrafficLightMaster>) owner.getMasterTrafficLights();
+
+		GeoTrafficLightMaster mtlSouth = null;
+		GeoTrafficLightMaster mtlNorth = null;
+		GeoTrafficLightMaster mtlEast = null;
+		GeoTrafficLightMaster mtlWest = null;
+
+		double maxDistSouth = Double.MAX_VALUE;
+		double maxDistNorth = Double.MAX_VALUE;
+		double maxDistEast = Double.MAX_VALUE;
+		double maxDistWest = Double.MAX_VALUE;
+		double dist = 0;
+
+		for (int i = 0; i < mtl.size(); i++) {
+			GeoTrafficLightMaster currentTrafficLight = mtl.get(i);
+			dist = Utils.distance(owner.getCurrentPos().lat, owner.getCurrentPos().lon,
+					currentTrafficLight.getCurrentPos().lat, currentTrafficLight.getCurrentPos().lon);
+
+			// NORTH case
+			if (currentTrafficLight.getCurrentPos().lon < owner.getCurrentPos().lon) {
+				if (dist < maxDistNorth && dist < RoutingApplicationParameters.distMax
+						&& currentTrafficLight.getId() != owner.getId()
+						&& trafficLightDiffers(currentTrafficLight, mtlSouth, mtlEast, mtlWest)) {
+					maxDistNorth = dist;
+					mtlNorth = currentTrafficLight;
+				}
+			}
+
+			// SOUTH case
+			if (currentTrafficLight.getCurrentPos().lon > owner.getCurrentPos().lon) {
+				if (dist < maxDistSouth && dist < RoutingApplicationParameters.distMax
+						&& currentTrafficLight.getId() != owner.getId()
+						&& trafficLightDiffers(currentTrafficLight, mtlNorth, mtlEast, mtlWest)) {
+					maxDistSouth = dist;
+					mtlSouth = currentTrafficLight;
+				}
+			}
+
+			// EAST case
+			if (currentTrafficLight.getCurrentPos().lat > owner.getCurrentPos().lat) {
+				if (dist < maxDistEast && dist < RoutingApplicationParameters.distMax
+						&& currentTrafficLight.getId() != owner.getId()
+						&& trafficLightDiffers(currentTrafficLight, mtlSouth, mtlNorth, mtlWest)) {
+					maxDistEast = dist;
+					mtlEast = currentTrafficLight;
+				}
+			}
+
+			// WEST case
+			if (currentTrafficLight.getCurrentPos().lat < owner.getCurrentPos().lat) {
+				if (dist < maxDistWest && dist < RoutingApplicationParameters.distMax
+						&& currentTrafficLight.getId() != owner.getId()
+						&& trafficLightDiffers(currentTrafficLight, mtlSouth, mtlEast, mtlNorth)) {
+					maxDistWest = dist;
+					mtlWest = currentTrafficLight;
+				}
+			}
+
+		}
+
+		HashMap<Integer, NetworkInterface> ret = new HashMap<Integer, NetworkInterface>();
+		if (maxDistNorth < RoutingApplicationParameters.distMax && mtlNorth != null) {
+			ret.put(TrafficLightDynamicRoutingApp.NORTH_INDEX, mtlNorth.getNetworkInterface(this.getType()));
+		}
+		if (maxDistSouth < RoutingApplicationParameters.distMax && mtlSouth != null) {
+			ret.put(TrafficLightDynamicRoutingApp.SOUTH_INDEX, mtlSouth.getNetworkInterface(this.getType()));
+		}
+		if (maxDistEast < RoutingApplicationParameters.distMax && mtlEast != null) {
+			ret.put(TrafficLightDynamicRoutingApp.EAST_INDEX, mtlEast.getNetworkInterface(this.getType()));
+		}
+		if (maxDistWest < RoutingApplicationParameters.distMax && mtlWest != null) {
+			ret.put(TrafficLightDynamicRoutingApp.WEST_INDEX, mtlWest.getNetworkInterface(this.getType()));
+		}
+
+		return ret;
+	}
+
+
 	public List<NetworkInterface> discoverClosestsTrafficLightMasters() {
 		Entity owner = getOwner();
 		ArrayList<GeoTrafficLightMaster> mtl = (ArrayList<GeoTrafficLightMaster>) owner.getMasterTrafficLights();

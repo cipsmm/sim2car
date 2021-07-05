@@ -1,5 +1,6 @@
 package controller.newengine;
 
+import application.dynamic_routing.TrafficLightDynamicRoutingApp;
 import gui.View;
 import gui.Viewer;
 
@@ -24,16 +25,13 @@ import model.parameters.Globals;
 import model.parameters.MapConfig;
 import model.parameters.MapConfiguration;
 import model.threadpool.ThreadPool;
-import model.threadpool.tasks.CarApplicationsRun;
-import model.threadpool.tasks.CarMove;
-import model.threadpool.tasks.CarPrepareMove;
-import model.threadpool.tasks.ServerApplicationsRun;
-import model.threadpool.tasks.TrafficLightApplicationsRun;
-import model.threadpool.tasks.TrafficLightChangeColor;
+import model.threadpool.tasks.*;
 import controller.engine.EngineInterface;
 import controller.network.NetworkType;
+import application.streetCostSharing.StreetsCostSharing;
 
-	/**
+
+/**
 	 * Class used to represent the brain of the simulator.
 	 * It reads the data for cars and servers applies the designated applications to be run on them.
 	 * Runs the simulation steps for each time frame (see the Runnable hidden object)
@@ -57,7 +55,7 @@ public class SimulationEngine implements EngineInterface {
 	public TreeMap<Long,Entity> entities;
 	
 	/** Graphic interface visualizer */
-	private Viewer viewer;
+	public Viewer viewer;
 	
 	/** Thread Pool reference */
 	private ThreadPool threadPool;
@@ -68,8 +66,12 @@ public class SimulationEngine implements EngineInterface {
 	/** Simulation time */
 	private long time = 0;
 
+	private int MAX_CARS_UPDATE_ROUTE = 10;
+
 	private static final SimulationEngine _instance = new SimulationEngine();
 	private static Object lock = null;
+
+	public static boolean oneMessage = true;
 
 	/**
 	 * Constructor is called just once, so all initializations are safe to be done here...
@@ -100,15 +102,28 @@ public class SimulationEngine implements EngineInterface {
 	}
 
 	public void setUp() {
-		
+
 		entities.putAll(EngineUtils.getCars(getMapConfig().getTracesListFilename(), viewer, mobilityEngine) );
 		entities.putAll(EngineUtils.getServers(getMapConfig().getAccessPointsFilename(), viewer, mobilityEngine) );
 		if (Globals.useTrafficLights || Globals.useDynamicTrafficLights) {
 			entities.putAll(EngineUtils.getTrafficLights(getMapConfig().getTrafficLightsFilename(),
 					getMapConfig().getTrafficLightsLoaded(), viewer, mobilityEngine));
 		}
+
+		/* the applications are added to the traffic lights in EngineUtils.
+		* Just need to call "postConstructInit" after all of the traffic lights are
+		* generated*/
+		if (Globals.dynamicRoutes && Globals.costSharingApps) {
+			for (Entity e : entities.values()) {
+				if (e instanceof GeoTrafficLightMaster) {
+					TrafficLightDynamicRoutingApp app = (TrafficLightDynamicRoutingApp)e.
+							getApplication(ApplicationType.TRAFFIC_LIGHT_ROUTING_APP);
+					app.postConstructInit();
+				}
+			}
+		}
 		
-		if (Globals.activeApplications.contains(ApplicationType.ROUTING_APP)) {
+		if (Globals.activeApplications.contains(ApplicationType.ROUTING_APP) && !Globals.dynamicRoutes) {
 			for (Entity e : entities.values()) {
 				if (e instanceof GeoServer) {
 					EngineUtils.addApplicationToServer((GeoServer) e);
@@ -157,6 +172,21 @@ public class SimulationEngine implements EngineInterface {
 						
 					}
 
+//					select the cars for route update. All cars are stored in a queue for equal chances
+					if (time % 3 == 0 && Globals.dynamicRoutes) {
+						if (EngineUtils.carsQueue.size() > 0) {
+							GeoCar currentCar = EngineUtils.carsQueue.poll();
+							currentCar.setTurnToUpdateRoute(true);
+							currentCar.setAppointedForRouteRecalculation(false);
+							currentCar.setRouteIncreasedCost(0);
+						}
+					}
+
+					if (time % 100 == 0 && Globals.maliciousCars > 0) {
+						System.out.println("TIME: " + time + "  Malicious costs: " + StreetsCostSharing.counterMaliciousCosts + "  Real: " + StreetsCostSharing.counterRealCosts);
+					}
+
+
 					threadPool.waitForThreadPoolProcessing();
 
 					for (Entity e : entities.values()) {
@@ -188,8 +218,9 @@ public class SimulationEngine implements EngineInterface {
 					viewer.updateCarPositions();
 					viewer.updateTrafficLightsColors();
 					viewer.setTime("" + time);
+
 					
-					if( (time + 2)% RoutingApplicationParameters.SamplingInterval == 0)
+					if( (time + 5)% RoutingApplicationParameters.SamplingInterval == 0)
 					{
 						System.out.println("WRITTING ROUTES TIME TO FILES!");
 						for (Entity e : entities.values()) {

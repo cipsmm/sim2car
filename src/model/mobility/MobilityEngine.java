@@ -1,5 +1,6 @@
 package model.mobility;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -11,6 +12,8 @@ import java.util.logging.Logger;
 import application.routing.RoutingApplicationData.RoutingApplicationState;
 import application.routing.RoutingApplicationParameters;
 import application.routing.RoutingRoadCost;
+import controller.network.NetworkWiFi;
+import gui.CarView;
 import model.Entity;
 import model.GeoCar;
 import model.GeoCarRoute;
@@ -388,7 +391,13 @@ public class MobilityEngine {
 		else
 			return way.getNodeIndex(around.getSecond().id);
 	}
-	public static void initDataDijkstraQ( TreeMap<Long, Way> graph, Node startNode, TreeMap<Pair<Long,Long>,Node> path, TreeMap<Pair<Long,Long>,Double> distance, int depthMax ){
+
+	/*
+		this function explores the graph in a BFS manner and adds into the "path" TreeMap
+		the nodes that could be visited, but being constrained by a maximum depth
+		Path has pairs of (wayId, nodeId) as keys and Nodes as values (nodes with default value - Node(-1, -1, -1))
+	 */
+	public static void  initDataDijkstraQ( TreeMap<Long, Way> graph, Node startNode, TreeMap<Pair<Long,Long>,Node> path, TreeMap<Pair<Long,Long>,Double> distance, int depthMax ){
 
 		int level = 0;
 		LinkedList<Pair<Long,Long>> q = new LinkedList<Pair<Long,Long>>();
@@ -482,7 +491,8 @@ public class MobilityEngine {
 			initDataDijkstra(streetsGraph, jointNode, path, distance, depthMax - 1 );
 		}
 	}
-	
+
+
 	/**
 	 * FindPath - returns a list with the intersections that have to passed.
 	 * @param graph - the street graphs
@@ -693,9 +703,71 @@ public class MobilityEngine {
 	}
 
 
+	public GeoCar getCarOnOppositeSide(GeoCar car) {
+		MapPoint currentPos = car.getCurrentPos();
+		GeoCarRoute route = car.getCurrentRoute();
+		Way way = streetsGraph.get(currentPos.wayId);
+		Node currentNode = way.nodes.get(currentPos.segmentIndex);
+		Entity carOnTheOtherSide;
+		Long crtCell = currentPos.cellIndex;
+		int direction, queueNr;
+		double dist;
+		Iterator<Node> it = route.getIntersectionList().iterator();
+		Node next = null;
+
+		if (way.oneway) return null;
+
+		while (it.hasNext()) {
+			next = it.next();
+			dist = TraceParsingTool.distance(currentPos.lat, currentPos.lon, next.lat, next.lon);
+
+			/** check if the next node is still on the same way.
+			 * check if the distance between nodes does not exceed the max wifi range*/
+
+			if (currentNode.wayId != next.wayId
+					 || dist > NetworkWiFi.maxWifiRange / 10000) {
+				break;
+			}
+			direction = getDirection(currentNode, next);
+
+			/*select the opposite direction.*/
+			queueNr = (direction == 1) ? 1 : 0;
+
+			int segmentIndex = way.getNodeIndex(currentNode.id);
+
+			/*segment index remains the same because the segments have the same order
+			* in both directions*/
+			int queueSegmentIndex = (direction == 1) ?
+					 segmentIndex :
+					way.nodes.size() - 1 - segmentIndex;
+
+			TreeMap<Long, Cell> segmentQueue = way.streetQueues[queueNr].get(queueSegmentIndex);
+
+
+			if (segmentQueue.size() != 0) {
+				Cell cell = segmentQueue.firstEntry().getValue();
+				carOnTheOtherSide = SimulationEngine.getInstance().
+						entities.get(cell.trafficEntityId);
+				if (carOnTheOtherSide.getId() == car.getId()) {
+					return null;
+				}
+
+				double distAhead = TraceParsingTool.distance(car.getCurrentPos().lat, car.getCurrentPos().lon,
+						carOnTheOtherSide.getCurrentPos().lat, carOnTheOtherSide.getCurrentPos().lon);
+
+				if (distAhead > NetworkWiFi.maxWifiRange / 10000) {
+					return null;
+				}
+
+				return (GeoCar) carOnTheOtherSide;
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * Returns the car in front of the given car, within a given distance.
-	 * 
+	 *
 	 * @param	car
 	 * @param	distance
 	 * @return	null if it's the end of the route
@@ -716,22 +788,22 @@ public class MobilityEngine {
 
 		if (crtPos.equals(route.getEndPoint()))
 			return null;
-		
+
 		int queueNr = (crtPos.direction == 1) ? 0 : 1;
-		
+
 		Iterator<Node> it = route.getIntersectionList().iterator();
 		Node next = null;
 		while (it.hasNext()) {
 			next = it.next();
-			
+
 			/* Check if the next node has a traffic light control */
 			if (next.hasTrafficLightControl()) {
 				elementAhead = SimulationEngine.getInstance().entities.get(next.getTrafficLightId());
 				distAhead += TraceParsingTool.distance(lat, lon,
 						elementAhead.getCurrentPos().lat, elementAhead.getCurrentPos().lon);
-				return new Pair<Entity, Double>(elementAhead, distAhead);				
+				return new Pair<Entity, Double>(elementAhead, distAhead);
 			}
-			
+
 			if (crt.wayId != next.wayId) {
 				crt = getSegmentById(next.wayId, crt.id);
 				/**
@@ -742,52 +814,52 @@ public class MobilityEngine {
 					return null;
 			}
 			way = streetsGraph.get(crt.wayId);
-			
+
 			/**
-			 * TODO(Cosmin): Check this condition because it 
+			 * TODO(Cosmin): Check this condition because it
 			 * seems not to work properly due to the fact that
 			 * one street can have a joint node in the middle of
 			 * the nodes vector. !!!
-			 */			
+			 */
 			int direction = getDirection(crt, next);
 
 			queueNr = (direction == 1) ? 0 : 1;
-			
+
 			int segmentIndex = way.getNodeIndex(crt.id);
 			int queueSegmentIndex = (direction == 1) ? segmentIndex :
 					way.nodes.size() - 1 - segmentIndex;
-			
+
 			TreeMap<Long, Cell> segmentQueue = way.streetQueues[queueNr].get(queueSegmentIndex);
-			
+
 			/* On the first segment, remove cars behind current car */
 			if (way.id == crtPos.wayId && segmentIndex == crtPos.segmentIndex) {
 				TreeMap<Long, Cell> aux = new TreeMap<Long, Cell>(segmentQueue);
 				segmentQueue = new TreeMap<Long, Cell>(aux.tailMap(crtCell));
 				segmentQueue.remove(crtCell);
 			}
-			
+
 			if (segmentQueue.size() != 0) {
 				Cell cell = segmentQueue.firstEntry().getValue();
 				elementAhead = SimulationEngine.getInstance().
-								entities.get(cell.trafficEntityId);
-				
+						entities.get(cell.trafficEntityId);
+
 				distAhead += TraceParsingTool.distance(lat, lon,
 						elementAhead.getCurrentPos().lat, elementAhead.getCurrentPos().lon);
 				return new Pair<Entity, Double>(elementAhead, distAhead);
 			}
-			
+
 			/* No car on this segment, move to the next one. */
 			double dist = TraceParsingTool.distance(lat, lon, crt.lat, crt.lon);
 			if (dist > distance)
 				return new Pair<Entity, Double>(null, null);
 			distance -= dist;
 			distAhead += dist;
-			
+
 			lat = crt.lat;
 			lon = crt.lon;
 			crt = next;
 		}
-		
+
 		return new Pair<Entity, Double>(null, null);
 	}
 	

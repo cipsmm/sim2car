@@ -38,7 +38,7 @@ public class Downloader {
 		
 		city = propF[0];
 	}
-	
+
 	public void downloadTraces(String propFile) {
 		
 		// Extract the city name

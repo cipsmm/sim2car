@@ -17,5 +17,9 @@ public enum MessageType {
 	ADD_WAITING_QUEUE,
 	REMOVE_WAITING_QUEUE,
 	/* Used by SincronizeIntersectionsApplication */
-	SYNCHRONIZE_TRAFFIC_LIGHTS
+	SYNCHRONIZE_TRAFFIC_LIGHTS,
+	/* Used by Dynamic Routing Apps */
+	CAR_INFORMS,
+	TRAFFIC_LIGHT_INFORMS,
+	OUTDATED_COSTS
 }

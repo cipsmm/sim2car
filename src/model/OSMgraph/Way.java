@@ -74,6 +74,7 @@ public class Way {
 		max_long = -360;
 	}
 
+
 	/** It is oneway or not */
 	public void setDirection(boolean val) {
 		oneway = val;

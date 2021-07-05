@@ -174,8 +174,8 @@ public class DownloadCore {
 			String traces = curDir.getAbsolutePath();
 			
 			parseConfigFile();
-			
-			if (city.equalsIgnoreCase("rome")) {
+
+			if (city.equalsIgnoreCase("src/configurations/simulator/rome")) {
 				String archive = t.getAbsolutePath() + File.separator + "rome.zip";
 				
 				if (mode.equalsIgnoreCase("D")) {
@@ -186,7 +186,8 @@ public class DownloadCore {
 				
 				unZipIt(archive, traces);
 				
-			} else if (city.equalsIgnoreCase("beijing")) {
+			} else if (city.equalsIgnoreCase("src/configurations/simulator/beijing")) {
+
 				String archive = t.getAbsolutePath() + File.separator + "beijing.zip";
 				
 				if (mode.equalsIgnoreCase("D")) {
@@ -197,7 +198,7 @@ public class DownloadCore {
 				
 				unZipIt(archive, traces);
 				
-			} else if (city.equalsIgnoreCase("sanfrancisco")) {
+			} else if (city.equalsIgnoreCase("src/configurations/simulator/sanfrancisco")) {
 				String archive = t.getAbsolutePath() + File.separator + "sanfrancisco.zip";
 				
 				if (mode.equalsIgnoreCase("D")) {
